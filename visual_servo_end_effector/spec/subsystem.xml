@@ -1,0 +1,52 @@
+<subsystem_definition>
+
+    <buffers>
+        <in alias="st"      type="velma_core_cs_task_cs_msgs::Status"     side="bottom"/>
+        <out alias="cmd"    type="velma_core_cs_task_cs_msgs::Command"    side="bottom"/>
+    </buffers>
+
+    <buffer_groups>
+        <buffer_group name="status" >
+            <obligatory name="st" />
+        </buffer_group>
+    </buffer_groups>
+
+    <predicates>
+        <predicate name="recvVisualServoCmd" />
+        <predicate name="recvIdleCmd" />
+    </predicates>
+
+    <behaviors>
+        <behavior name="idle"
+                stop_cond="recvVisualServoCmd"
+                err_cond="FALSE" >
+            <running_component name="stSplit" />
+            <running_component name="cmdConcate" />
+            <running_component name="Y" />
+        </behavior>
+        <behavior name="visual_servo"
+                stop_cond="recvIdleCmd"
+                err_cond="FALSE" >
+            <running_component name="visual_servo" />
+            <running_component name="stSplit" />
+            <running_component name="cmdConcate" />
+            <running_component name="Y" />
+        </behavior>
+    </behaviors>
+
+    <states initial="idle">
+        <state name="idle">
+            <behavior name="idle" />
+            <next_state name="visual_servo" init_cond="recvVisualServoCmd"/>
+            <buffer_group name="status" min_period="0.05" first_timeout="0.1" next_timeout="0.1" first_timeout_sim="1.0" used_time="sim" />
+        </state>
+        <state name="visual_servo">
+            <behavior name="visual_servo" />
+            <next_state name="idle" init_cond="recvIdleCmd"/>
+            <buffer_group name="status" min_period="0.05" first_timeout="0.1" next_timeout="0.1" first_timeout_sim="1.0" used_time="sim" />
+        </state>
+    </states>
+
+    <simulation use_ros_sim_clock="true" use_sim_clock="true" />
+
+</subsystem_definition>

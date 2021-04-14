@@ -1,0 +1,40 @@
+<subsystem_configuration>
+    <import package="rtt_barrett_hand_msgs" />
+    <import package="barrett_hand_move_action" />
+    <import package="eigen_typekit" />
+    <import package="rtt_control_msgs" />
+    <import package="rtt_rosclock" />
+    <import package="controller_common" />
+    <import package="velma_controller" />
+    <import package="rtt_cartesian_trajectory_msgs" />
+    <import package="rtt_std_msgs" />
+    <import package="rtt_tf" />
+    <import package="port_operations" />
+    <import package="force_control" />
+    <import package="rtt_force_control_msgs" />
+    <import package="rtt_velma_core_cs_task_cs_msgs" />
+    <import package="rtt_barrett_hand_action_msgs" />
+    <import package="rtt_grasped_action_msgs" />
+    <import package="rtt_identification_action_msgs" />
+    <import package="grasped_action" />
+    <import package="identification_action" />
+    <import package="visual_servo_end_effector" />
+
+    <io_buffer alias="st" name="velma_core_st3" />
+    <io_buffer alias="cmd" name="velma_core_cmd3" />
+
+    <component type="visual_servo_end_effector_types::VisualServoComponent" name="visual_servo" />
+    <component type="visual_servo_end_effector_types::ExtCommandsComponent" name="ext_commands" running="true" />
+
+    <connection from="stSplit.rWristPose_OUTPORT"       to="visual_servo.st_rWristPose_INPORT" />
+    <connection from="stSplit.lWristPose_OUTPORT"       to="visual_servo.st_lWristPose_INPORT" />
+    <connection from="visual_servo.cmd_cart_r_pose_OUTPORT"    to="cmdConcate.cart_r_pose_INPORT" />
+    <connection from="visual_servo.cmd_cart_l_pose_OUTPORT"    to="cmdConcate.cart_l_pose_INPORT" />
+
+    <ros_stream port="ext_commands.cmd_INPORT"    topic="/visual_servo_end_effector/cmd_in" />
+
+    <!-- debug streams -->
+    <ros_stream port="stSplit._OUTPORT"    topic="/visual_servo_end_effector/st" />
+    <ros_stream port="cmdConcate.msg_OUTPORT"   topic="/visual_servo_end_effector/cmd_out" />
+
+</subsystem_configuration>
