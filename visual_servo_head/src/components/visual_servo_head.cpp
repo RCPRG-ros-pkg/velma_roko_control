@@ -73,9 +73,9 @@ public:
             // VelmaHeadTrajectoryPoint[50]
             // cmd.trj
 
-            std::cout << cmd.start.toSec() << ": current q_des: " << st_head.q_desired[0] << ", goal: " << goal_pos_
-                        << ", current dq_des: " << st_head.dq_desired[0] << ", time_left: "
-                        << time_left << std::endl;
+            //std::cout << cmd.start.toSec() << ": current q_des: " << st_head.q_desired[0] << ", goal: " << goal_pos_
+            //            << ", current dq_des: " << st_head.dq_desired[0] << ", time_left: "
+            //            << time_left << std::endl;
 
             // Set the curernt point
             velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_current = cmd.trj[0];

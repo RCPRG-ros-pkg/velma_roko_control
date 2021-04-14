@@ -38,12 +38,12 @@
         <state name="idle">
             <behavior name="idle" />
             <next_state name="visual_servo" init_cond="recvVisualServoCmd"/>
-            <buffer_group name="status" min_period="0.04" first_timeout="0.08" next_timeout="0.08" first_timeout_sim="1.0" used_time="sim" />
+            <buffer_group name="status" min_period="0.0015" first_timeout="0.01" next_timeout="0.002" first_timeout_sim="1.0" used_time="sim" />
         </state>
         <state name="visual_servo">
             <behavior name="visual_servo" />
             <next_state name="idle" init_cond="recvIdleCmd"/>
-            <buffer_group name="status" min_period="0.04" first_timeout="0.08" next_timeout="0.08" first_timeout_sim="1.0" used_time="sim" />
+            <buffer_group name="status" min_period="0.0015" first_timeout="0.01" next_timeout="0.002" first_timeout_sim="1.0" used_time="sim" />
         </state>
     </states>
 
