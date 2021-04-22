@@ -31,10 +31,16 @@
     <connection from="visual_servo.cmd_cart_r_pose_OUTPORT"    to="cmdConcate.cart_r_pose_INPORT" />
     <connection from="visual_servo.cmd_cart_l_pose_OUTPORT"    to="cmdConcate.cart_l_pose_INPORT" />
 
+    <connection from="stSplit.q_OUTPORT"             to="visual_servo.q_all_INPORT" />
+    <connection from="stSplit.rArm_t_OUTPORT"        to="visual_servo.t_rArm_INPORT" />
+    <connection from="stSplit.lArm_t_OUTPORT"        to="visual_servo.t_lArm_INPORT" />
+    <connection from="stSplit.torso_t_OUTPORT"        to="visual_servo.t_torso_INPORT" />
+
     <ros_stream port="ext_commands.cmd_INPORT"    topic="/visual_servo_end_effector/cmd_in" />
 
     <!-- debug streams -->
     <ros_stream port="stSplit._OUTPORT"    topic="/visual_servo_end_effector/st" />
     <ros_stream port="cmdConcate.msg_OUTPORT"   topic="/visual_servo_end_effector/cmd_out" />
+    <ros_stream port="visual_servo.pose_array_OUTPORT"   topic="/visual_servo_end_effector/pose_array" />
 
 </subsystem_configuration>

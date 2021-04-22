@@ -30,9 +30,12 @@
 #include <rtt/base/PortInterface.hpp>
 #include "rtt_rosclock/rtt_rosclock.h"
 
+#include <Eigen/Dense>
 #include <kdl/frames.hpp>
 #include "geometry_msgs/Pose.h"
 #include "velma_core_cs_task_cs_msgs/CommandCartImp.h"
+
+#include "geometry_msgs/PoseArray.h"
 
 namespace visual_servo_end_effector_types {
 
@@ -42,19 +45,53 @@ public:
         : RTT::TaskContext(name)
         , port_status_r_wrist_in_("st_rWristPose_INPORT")
         , port_status_l_wrist_in_("st_lWristPose_INPORT")
+        , port_q_all_in_("q_all_INPORT")
+        , port_t_rArm_in_("t_rArm_INPORT")
+        , port_t_lArm_in_("t_lArm_INPORT")
+        , port_t_torso_in_("t_torso_INPORT")
         , port_cmd_cart_r_pose_out_("cmd_cart_r_pose_OUTPORT")
         , port_cmd_cart_l_pose_out_("cmd_cart_l_pose_OUTPORT")
+        , port_pose_array_out_("pose_array_OUTPORT")
         , phase_(0.0)    // For simple motion generation
     {
         this->ports()->addPort(port_status_r_wrist_in_);
         this->ports()->addPort(port_status_l_wrist_in_);
+        this->ports()->addPort(port_q_all_in_);
+        this->ports()->addPort(port_t_rArm_in_);
+        this->ports()->addPort(port_t_lArm_in_);
+        this->ports()->addPort(port_t_torso_in_);
         this->ports()->addPort(port_cmd_cart_r_pose_out_);
         this->ports()->addPort(port_cmd_cart_l_pose_out_);
+        this->ports()->addPort(port_pose_array_out_);
+
+        pose_array_.poses.resize(10);
     }
 
     void updateHook() {
         geometry_msgs::Pose status_r_wrist_;
         if (port_status_r_wrist_in_.read(status_r_wrist_) == RTT::NewData) {
+            AllJoints q_all;
+            port_q_all_in_.read(q_all);
+            std::cout << "POSITION: torso: " << q_all[0] << ", right arm: " << q_all[1] << ", "
+                << q_all[2] << ", " << q_all[3] << ", " << q_all[4] << ", " << q_all[5]
+                << ", " << q_all[6] << ", " << q_all[7] << ", left arm: " << q_all[8] << ", "
+                << q_all[9] << ", " << q_all[10] << ", " << q_all[11] << ", " << q_all[12]
+                << ", " << q_all[13] << ", " << q_all[14] << std::endl;
+
+            ArmJoints t_rArm;
+            port_t_rArm_in_.read(t_rArm);
+
+            ArmJoints t_lArm;
+            port_t_lArm_in_.read(t_lArm);
+
+            double t_torso;
+            port_t_torso_in_.read(t_torso);
+
+            std::cout << "TORQUES: torso: " << t_torso << ", right arm: " << t_rArm[0] << ", "
+                << t_rArm[1] << ", " << t_rArm[2] << ", " << t_rArm[3] << ", " << t_rArm[4]
+                << ", " << t_rArm[5] << ", " << t_rArm[6] << ", left arm: " << t_lArm[0] << ", "
+                << t_lArm[1] << ", " << t_lArm[2] << ", " << t_lArm[3] << ", " << t_lArm[4]
+                << ", " << t_lArm[5] << ", " << t_lArm[6] << std::endl;
 
             // generate simple motion on a circle and limit the velocity
             const double subsystem_frequency = 20;      // [Hz]
@@ -130,6 +167,15 @@ public:
             cmd_r_pose.goal_time_tolerance = ros::Duration( 0 );
 
             port_cmd_cart_r_pose_out_.write(cmd_r_pose);
+
+            pose_array_.header.stamp = rtt_rosclock::host_now();
+            pose_array_.header.frame_id = "torso_base";
+            for (int i = 0; i < 10; ++i) {
+                pose_array_.poses[i] = wrist_r_goal_pose;
+                double offset = double(i) * 0.1;
+                pose_array_.poses[i].position.x += offset;
+            }
+            port_pose_array_out_.write(pose_array_);
         }
     }
 
@@ -137,8 +183,21 @@ private:
     // OROCOS ports
     RTT::InputPort<geometry_msgs::Pose > port_status_r_wrist_in_;
     RTT::InputPort<geometry_msgs::Pose > port_status_l_wrist_in_;
+
+    typedef Eigen::Matrix<double, 33, 1> AllJoints;
+    RTT::InputPort<AllJoints > port_q_all_in_;
+
+    typedef Eigen::Matrix<double, 7, 1> ArmJoints;
+    RTT::InputPort<ArmJoints > port_t_rArm_in_;
+    RTT::InputPort<ArmJoints > port_t_lArm_in_;
+    RTT::InputPort<double > port_t_torso_in_;
+
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandCartImpTrjPose > port_cmd_cart_r_pose_out_;
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandCartImpTrjPose > port_cmd_cart_l_pose_out_;
+
+    // Ports used for visualization in ROS
+    geometry_msgs::PoseArray pose_array_;
+    RTT::OutputPort<geometry_msgs::PoseArray > port_pose_array_out_;
 
     double phase_;   // For simple motion generation
 };
@@ -146,4 +205,3 @@ private:
 }   // namespace velma_core_cs_types
 
 ORO_LIST_COMPONENT_TYPE(visual_servo_end_effector_types::VisualServoComponent)
-
