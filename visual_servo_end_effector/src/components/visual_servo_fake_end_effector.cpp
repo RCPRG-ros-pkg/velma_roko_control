@@ -51,8 +51,10 @@ public:
         , port_t_torso_in_("t_torso_INPORT")
         , port_cmd_cart_r_pose_out_("cmd_cart_r_pose_OUTPORT")
         , port_cmd_cart_l_pose_out_("cmd_cart_l_pose_OUTPORT")
+        , port_cmd_cart_r_pose_in_("cmd_cart_r_pose_INPORT")
+        , port_xce_end_out_("xce_end_OUTPORT")
         , port_pose_array_out_("pose_array_OUTPORT")
-        , phase_(0.0)    // For simple motion generation
+        , command_active_(false)
     {
         this->ports()->addPort(port_status_r_wrist_in_);
         this->ports()->addPort(port_status_l_wrist_in_);
@@ -62,123 +64,174 @@ public:
         this->ports()->addPort(port_t_torso_in_);
         this->ports()->addPort(port_cmd_cart_r_pose_out_);
         this->ports()->addPort(port_cmd_cart_l_pose_out_);
+        this->ports()->addPort(port_cmd_cart_r_pose_in_);
+        this->ports()->addPort(port_xce_end_out_);
         this->ports()->addPort(port_pose_array_out_);
 
         pose_array_.poses.resize(10);
     }
 
     void updateHook() {
-        /*
-        geometry_msgs::Pose status_r_wrist_;
-        if (port_status_r_wrist_in_.read(status_r_wrist_) == RTT::NewData) {
-            AllJoints q_all;
-            port_q_all_in_.read(q_all);
-            std::cout << "POSITION: torso: " << q_all[0] << ", right arm: " << q_all[1] << ", "
-                << q_all[2] << ", " << q_all[3] << ", " << q_all[4] << ", " << q_all[5]
-                << ", " << q_all[6] << ", " << q_all[7] << ", left arm: " << q_all[8] << ", "
-                << q_all[9] << ", " << q_all[10] << ", " << q_all[11] << ", " << q_all[12]
-                << ", " << q_all[13] << ", " << q_all[14] << std::endl;
+        geometry_msgs::Pose status_r_wrist;
+        if (port_status_r_wrist_in_.read(status_r_wrist) != RTT::NewData) {
+            return;
+        }
 
-            ArmJoints t_rArm;
-            port_t_rArm_in_.read(t_rArm);
+        if (!command_active_) {
+            // There is no active command, so we can listen for new commands
+            if (port_cmd_cart_r_pose_in_.read(active_trajectory_) == RTT::NewData) {
+                // Save the commanded trajectory for further 20Hz intepolation
+                starting_r_wrist_pose_ = status_r_wrist;
+                // Update the start time
+                active_trajectory_.start = rtt_rosclock::host_now();
+                // Set a flag for active command
+                command_active_ = true;
+                std::cout << "Received a new command" << std::endl;
+            }
+        }
 
-            ArmJoints t_lArm;
-            port_t_lArm_in_.read(t_lArm);
+        if (command_active_) {
+            // There is an active command, so interpolate for next 10 cycles 20Hz
+            const int cycles_forward = 10;
+            const ros::Duration cycle_interval(0.05);
+            ros::Time current_time = rtt_rosclock::host_now();
 
-            double t_torso;
-            port_t_torso_in_.read(t_torso);
+            velma_core_cs_task_cs_msgs::CommandCartImpTrjPose trj_out;
+            trj_out.start = current_time;
 
-            std::cout << "TORQUES: torso: " << t_torso << ", right arm: " << t_rArm[0] << ", "
-                << t_rArm[1] << ", " << t_rArm[2] << ", " << t_rArm[3] << ", " << t_rArm[4]
-                << ", " << t_rArm[5] << ", " << t_rArm[6] << ", left arm: " << t_lArm[0] << ", "
-                << t_lArm[1] << ", " << t_lArm[2] << ", " << t_lArm[3] << ", " << t_lArm[4]
-                << ", " << t_lArm[5] << ", " << t_lArm[6] << std::endl;
-
-            // generate simple motion on a circle and limit the velocity
-            const double subsystem_frequency = 20;      // [Hz]
-            const double time_step = 1.0 / subsystem_frequency; // [s]
-            const double radius = 0.05;                 // [m]
-
-            const double max_vel = 0.1;                 // [m/s]
-            const double rate = max_vel / radius;       // [rad/s]
-            const double max_pos_change = max_vel * time_step;    // [m]
-
-            const KDL::Vector center_pt(0.15, -0.4, 0.68);
-            KDL::Vector goal_pt = center_pt +
-                                        KDL::Vector(radius * cos(phase_), 0, radius * sin(phase_));
-
-            phase_ += rate * time_step;
-
-            KDL::Vector current_pt(status_r_wrist_.position.x, status_r_wrist_.position.y,
-                                                                    status_r_wrist_.position.z);
-
-            // limit the velocity
-            KDL::Vector error = goal_pt - current_pt;
-            if (error.Norm() > max_pos_change) {
-                error.Normalize();
-                goal_pt = current_pt + max_pos_change * error;
+            bool finish = false;
+            ros::Duration time_from_start(0.0);
+            for (int i = 0; i < cycles_forward; ++i) {
+                time_from_start += cycle_interval;
+                if (!getInterpolatedPointAtTime(current_time + time_from_start, trj_out.trj[i].pose)
+                        && i == 0) {
+                    finish = true;
+                }
+                trj_out.trj[i].time_from_start = time_from_start;
+            }
+            
+            if (finish) {
+                // There is nothing more to interpolate
+                command_active_ = false;
+                std::cout << "Finished motion" << std::endl;
+                return;
             }
 
-            geometry_msgs::Pose wrist_r_goal_pose;
-            wrist_r_goal_pose.position.x = goal_pt.x();
-            wrist_r_goal_pose.position.y = goal_pt.y();
-            wrist_r_goal_pose.position.z = goal_pt.z();
 
-            wrist_r_goal_pose.orientation.x = -0.158736024039;
-            wrist_r_goal_pose.orientation.y = 0.860902273027;
-            wrist_r_goal_pose.orientation.z = -0.0341836807939;
-            wrist_r_goal_pose.orientation.w = 0.482163485694;
-
-
-            // rosmsg show velma_core_cs_task_cs_msgs/CommandCartImpTrjPose
-            velma_core_cs_task_cs_msgs::CommandCartImpTrjPose cmd_r_pose;
-            // time
-            cmd_r_pose.start = rtt_rosclock::host_now();
-
-            cartesian_trajectory_msgs::CartesianTrajectoryPoint& pt_current = cmd_r_pose.trj[0];
-            pt_current.time_from_start = ros::Duration(0.0);
-            pt_current.pose = status_r_wrist_;
-            // pt_current.twist // this is ignored
-
-            cartesian_trajectory_msgs::CartesianTrajectoryPoint& pt_next = cmd_r_pose.trj[1];
-            pt_next.time_from_start = ros::Duration(time_step);
-            pt_next.pose = wrist_r_goal_pose;
-
-            cmd_r_pose.count = 2;
+            trj_out.count = cycles_forward;
 
             // set path tolerance
-            cmd_r_pose.path_tolerance.position.x = 0.1;
-            cmd_r_pose.path_tolerance.position.y = 0.1;
-            cmd_r_pose.path_tolerance.position.z = 0.1;
+            trj_out.path_tolerance.position.x = 0.1;
+            trj_out.path_tolerance.position.y = 0.1;
+            trj_out.path_tolerance.position.z = 0.1;
 
-            cmd_r_pose.path_tolerance.rotation.x = 0.1;
-            cmd_r_pose.path_tolerance.rotation.y = 0.1;
-            cmd_r_pose.path_tolerance.rotation.z = 0.1;
+            trj_out.path_tolerance.rotation.x = 0.1;
+            trj_out.path_tolerance.rotation.y = 0.1;
+            trj_out.path_tolerance.rotation.z = 0.1;
 
             // set goal tolerance
-            cmd_r_pose.goal_tolerance.position.x = 0.01;
-            cmd_r_pose.goal_tolerance.position.y = 0.01;
-            cmd_r_pose.goal_tolerance.position.z = 0.01;
+            trj_out.goal_tolerance.position.x = 0.01;
+            trj_out.goal_tolerance.position.y = 0.01;
+            trj_out.goal_tolerance.position.z = 0.01;
 
-            cmd_r_pose.goal_tolerance.rotation.x = 0.01;
-            cmd_r_pose.goal_tolerance.rotation.y = 0.01;
-            cmd_r_pose.goal_tolerance.rotation.z = 0.01;
+            trj_out.goal_tolerance.rotation.x = 0.01;
+            trj_out.goal_tolerance.rotation.y = 0.01;
+            trj_out.goal_tolerance.rotation.z = 0.01;
 
             // duration - must be set to 0, to ignore old time stamp
-            cmd_r_pose.goal_time_tolerance = ros::Duration( 0 );
+            trj_out.goal_time_tolerance = ros::Duration( 0 );
 
-            port_cmd_cart_r_pose_out_.write(cmd_r_pose);
+            port_cmd_cart_r_pose_out_.write(trj_out);
 
-            pose_array_.header.stamp = rtt_rosclock::host_now();
-            pose_array_.header.frame_id = "torso_base";
-            for (int i = 0; i < 10; ++i) {
-                pose_array_.poses[i] = wrist_r_goal_pose;
-                double offset = double(i) * 0.1;
-                pose_array_.poses[i].position.x += offset;
-            }
-            port_pose_array_out_.write(pose_array_);
+            // Send the last point in the trajectory
+            port_xce_end_out_.write(active_trajectory_.trj[active_trajectory_.count-1].pose);
+
+            //pose_array_.header.stamp = rtt_rosclock::host_now();
+            //pose_array_.header.frame_id = "torso_base";
+            //for (int i = 0; i < 10; ++i) {
+            //    pose_array_.poses[i] = wrist_r_goal_pose;
+            //    double offset = double(i) * 0.1;
+            //    pose_array_.poses[i].position.x += offset;
+            //}
+            //port_pose_array_out_.write(pose_array_);
         }
-        */
+    }
+
+    bool getInterpolatedPointAtTime(const ros::Time& time, geometry_msgs::Pose& out_pose) const {
+
+        // Get the current segment
+        // trj pt idx:     0    1    2    3    4    5
+        // trj times:      2    4    6    8    10   12
+        // current time: 1    3    5    7
+        // next pt idx:  0    1    2    3
+        int next_pt_idx = -1;   // Set to -1 to detect the 'finish' condition
+        for (int pt_idx = 0; pt_idx < active_trajectory_.count; ++pt_idx) {
+            ros::Time pt_time = active_trajectory_.start
+                                            + active_trajectory_.trj[pt_idx].time_from_start;
+            if (time < pt_time) {
+                next_pt_idx = pt_idx;
+            }
+            else {
+                break;
+            }
+        }
+
+        cartesian_trajectory_msgs::CartesianTrajectoryPoint p0;
+        if (next_pt_idx < 0) {
+            // All points in the trajectory are old
+            // Set the pose to the last point in the trajectory
+            out_pose = active_trajectory_.trj[active_trajectory_.count-1].pose;
+            return false;
+        }
+        else if (next_pt_idx == 0) {
+            // Interpolate from the starting pose to the first point
+            p0.pose = starting_r_wrist_pose_;
+            p0.time_from_start = ros::Duration(0.0);
+        }
+        else { // next_pt_idx > 0
+            // Interpolate between two points
+            p0 = active_trajectory_.trj[next_pt_idx-1];
+        }
+
+        const cartesian_trajectory_msgs::CartesianTrajectoryPoint& p1 =
+                                                        active_trajectory_.trj[next_pt_idx];
+        out_pose = interpolate(p0, p1, time);
+        return true;
+    }
+
+
+    geometry_msgs::Pose interpolate(const cartesian_trajectory_msgs::CartesianTrajectoryPoint& p0,
+                                    const cartesian_trajectory_msgs::CartesianTrajectoryPoint& p1,
+                                                                            ros::Time t) const {
+        geometry_msgs::Pose pose;
+
+        ros::Time t0 = active_trajectory_.start + p0.time_from_start;
+        ros::Time t1 = active_trajectory_.start + p1.time_from_start;
+
+        pose.position.x = interpolate(p0.pose.position.x, p1.pose.position.x,
+        t0.toSec(), t1.toSec(), t.toSec());
+        pose.position.y = interpolate(p0.pose.position.y, p1.pose.position.y,
+        t0.toSec(), t1.toSec(), t.toSec());
+        pose.position.z = interpolate(p0.pose.position.z, p1.pose.position.z,
+        t0.toSec(), t1.toSec(), t.toSec());
+
+        Eigen::Quaterniond q0(p0.pose.orientation.w, p0.pose.orientation.x,
+        p0.pose.orientation.y, p0.pose.orientation.z);
+        Eigen::Quaterniond q1(p1.pose.orientation.w, p1.pose.orientation.x,
+        p1.pose.orientation.y, p1.pose.orientation.z);
+
+        double a = interpolate(0.0, 1.0, t0.toSec(), t1.toSec(), t.toSec());
+        Eigen::Quaterniond q = q0.slerp(a, q1);
+        pose.orientation.w = q.w();
+        pose.orientation.x = q.x();
+        pose.orientation.y = q.y();
+        pose.orientation.z = q.z();
+
+        return pose;
+    }
+
+    double interpolate(double p0, double p1, double t0, double t1, double t) const {
+        return (p0 + (p1 - p0) * (t - t0) / (t1 - t0));
     }
 
 private:
@@ -194,14 +247,22 @@ private:
     RTT::InputPort<ArmJoints > port_t_lArm_in_;
     RTT::InputPort<double > port_t_torso_in_;
 
+    // Fake Cartesian trajectory command (from the task agent group)
+    geometry_msgs::Pose starting_r_wrist_pose_;
+    velma_core_cs_task_cs_msgs::CommandCartImpTrjPose active_trajectory_;
+    RTT::InputPort<velma_core_cs_task_cs_msgs::CommandCartImpTrjPose > port_cmd_cart_r_pose_in_;
+    bool command_active_;
+
+    // Data for manipulation strategy component: the pose at the catch moment
+    RTT::OutputPort<geometry_msgs::Pose > port_xce_end_out_;
+
+
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandCartImpTrjPose > port_cmd_cart_r_pose_out_;
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandCartImpTrjPose > port_cmd_cart_l_pose_out_;
 
     // Ports used for visualization in ROS
     geometry_msgs::PoseArray pose_array_;
     RTT::OutputPort<geometry_msgs::PoseArray > port_pose_array_out_;
-
-    double phase_;   // For simple motion generation
 };
 
 }   // namespace velma_core_cs_types

@@ -64,7 +64,7 @@ public:
                 recvVisualServoManipStCmd_ = false;
             }
             else if (cmd.data == 2) {
-                std::cout << "ExtCommandsComponent: Received command: cart_imp_obst" << std::endl;
+                std::cout << "ExtCommandsComponent: Received command: visual_servo_manip_st" << std::endl;
                 recvVisualServoCmd_ = false;
                 recvIdleCmd_ = false;
                 recvVisualServoManipStCmd_ = true;
