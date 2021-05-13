@@ -25,6 +25,8 @@
 
     <component type="visual_servo_end_effector_types::VisualServoComponent" name="visual_servo" />
     <component type="visual_servo_end_effector_types::ExtCommandsComponent" name="ext_commands" running="true" />
+    <component type="visual_servo_end_effector_types::ManipulationStrategyComponent" name="manipulation_strategy" />
+    <component type="visual_servo_end_effector_types::VisualServoFakeComponent" name="visual_servo_fake" />
 
     <connection from="stSplit.rWristPose_OUTPORT"       to="visual_servo.st_rWristPose_INPORT" />
     <connection from="stSplit.lWristPose_OUTPORT"       to="visual_servo.st_lWristPose_INPORT" />
@@ -35,6 +37,18 @@
     <connection from="stSplit.rArm_t_OUTPORT"        to="visual_servo.t_rArm_INPORT" />
     <connection from="stSplit.lArm_t_OUTPORT"        to="visual_servo.t_lArm_INPORT" />
     <connection from="stSplit.torso_t_OUTPORT"        to="visual_servo.t_torso_INPORT" />
+
+
+    <connection from="stSplit.rWristPose_OUTPORT"       to="visual_servo_fake.st_rWristPose_INPORT" />
+    <connection from="stSplit.lWristPose_OUTPORT"       to="visual_servo_fake.st_lWristPose_INPORT" />
+    <connection from="visual_servo_fake.cmd_cart_r_pose_OUTPORT"    to="cmdConcate.cart_r_pose_INPORT" />
+    <connection from="visual_servo_fake.cmd_cart_l_pose_OUTPORT"    to="cmdConcate.cart_l_pose_INPORT" />
+
+    <connection from="stSplit.q_OUTPORT"             to="visual_servo_fake.q_all_INPORT" />
+    <connection from="stSplit.rArm_t_OUTPORT"        to="visual_servo_fake.t_rArm_INPORT" />
+    <connection from="stSplit.lArm_t_OUTPORT"        to="visual_servo_fake.t_lArm_INPORT" />
+    <connection from="stSplit.torso_t_OUTPORT"        to="visual_servo_fake.t_torso_INPORT" />
+
 
     <ros_stream port="ext_commands.cmd_INPORT"    topic="/visual_servo_end_effector/cmd_in" />
 

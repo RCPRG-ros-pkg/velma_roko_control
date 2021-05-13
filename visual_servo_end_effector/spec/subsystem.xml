@@ -14,20 +14,30 @@
     <predicates>
         <predicate name="recvVisualServoCmd" />
         <predicate name="recvIdleCmd" />
+        <predicate name="recvVisualServoManipStCmd" />
     </predicates>
 
     <behaviors>
         <behavior name="idle"
-                stop_cond="recvVisualServoCmd"
+                stop_cond="recvVisualServoCmd or recvVisualServoManipStCmd"
                 err_cond="FALSE" >
             <running_component name="stSplit" />
             <running_component name="cmdConcate" />
             <running_component name="Y" />
         </behavior>
         <behavior name="visual_servo"
-                stop_cond="recvIdleCmd"
+                stop_cond="recvIdleCmd or recvVisualServoManipStCmd"
                 err_cond="FALSE" >
             <running_component name="visual_servo" />
+            <running_component name="stSplit" />
+            <running_component name="cmdConcate" />
+            <running_component name="Y" />
+        </behavior>
+        <behavior name="visual_servo_manip_st"
+                stop_cond="recvIdleCmd or recvVisualServoCmd"
+                err_cond="FALSE" >
+            <running_component name="visual_servo_fake" />
+            <running_component name="manipulation_strategy" />
             <running_component name="stSplit" />
             <running_component name="cmdConcate" />
             <running_component name="Y" />
@@ -38,11 +48,19 @@
         <state name="idle">
             <behavior name="idle" />
             <next_state name="visual_servo" init_cond="recvVisualServoCmd"/>
+            <next_state name="visual_servo_manip_st" init_cond="recvVisualServoManipStCmd"/>
             <buffer_group name="status" min_period="0.05" first_timeout="0.1" next_timeout="0.1" first_timeout_sim="1.0" used_time="sim" />
         </state>
         <state name="visual_servo">
             <behavior name="visual_servo" />
             <next_state name="idle" init_cond="recvIdleCmd"/>
+            <next_state name="visual_servo_manip_st" init_cond="recvVisualServoManipStCmd"/>
+            <buffer_group name="status" min_period="0.05" first_timeout="0.1" next_timeout="0.1" first_timeout_sim="1.0" used_time="sim" />
+        </state>
+        <state name="visual_servo_manip_st">
+            <behavior name="visual_servo" />
+            <next_state name="idle" init_cond="recvIdleCmd"/>
+            <next_state name="visual_servo" init_cond="recvVisualServoCmd"/>
             <buffer_group name="status" min_period="0.05" first_timeout="0.1" next_timeout="0.1" first_timeout_sim="1.0" used_time="sim" />
         </state>
     </states>

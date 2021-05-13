@@ -39,13 +39,13 @@ public:
         : RTT::TaskContext(name)
         , port_cmd_in_("cmd_INPORT")
         , recvVisualServoCmd_(false)
-        , recvCartImpObstCmd_(false)
         , recvIdleCmd_(false)
+        , recvVisualServoManipStCmd_(false)
     {
         this->ports()->addPort(port_cmd_in_);
         this->addAttribute("recvVisualServoCmd", recvVisualServoCmd_);
-        this->addAttribute("recvCartImpObstCmd", recvCartImpObstCmd_);
         this->addAttribute("recvIdleCmd", recvIdleCmd_);
+        this->addAttribute("recvVisualServoManipStCmd", recvVisualServoManipStCmd_);
     }
 
     void updateHook() {
@@ -54,20 +54,20 @@ public:
             if (cmd.data == 0) {
                 std::cout << "ExtCommandsComponent: Received command: idle" << std::endl;
                 recvVisualServoCmd_ = false;
-                recvCartImpObstCmd_ = false;
                 recvIdleCmd_ = true;
+                recvVisualServoManipStCmd_ = false;
             }
             else if (cmd.data == 1) {
                 std::cout << "ExtCommandsComponent: Received command: visual_servo" << std::endl;
                 recvVisualServoCmd_ = true;
-                recvCartImpObstCmd_ = false;
                 recvIdleCmd_ = false;
+                recvVisualServoManipStCmd_ = false;
             }
             else if (cmd.data == 2) {
                 std::cout << "ExtCommandsComponent: Received command: cart_imp_obst" << std::endl;
                 recvVisualServoCmd_ = false;
-                recvCartImpObstCmd_ = true;
                 recvIdleCmd_ = false;
+                recvVisualServoManipStCmd_ = true;
             }
             else {
                 std::cout << "ExtCommandsComponent: Received unknown command" << std::endl;
@@ -79,8 +79,8 @@ private:
     // OROCOS ports
     RTT::InputPort<std_msgs::Int32 > port_cmd_in_;
     bool recvVisualServoCmd_;
-    bool recvCartImpObstCmd_;
     bool recvIdleCmd_;
+    bool recvVisualServoManipStCmd_;
 };
 
 }   // namespace velma_core_cs_types

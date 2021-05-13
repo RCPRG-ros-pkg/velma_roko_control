@@ -51,18 +51,18 @@ bool recvVisualServoCmd( const InputDataConstPtr& in_data, const std::vector<con
     return pred->get();
 }
 
-bool recvCartImpObstCmd( const InputDataConstPtr& in_data, const std::vector<const RTT::TaskContext*> &components) {
-    static const RTT::Attribute< bool >* pred = getBoolAttribute("ext_commands", "recvCartImpObstCmd", components);
+bool recvIdleCmd( const InputDataConstPtr& in_data, const std::vector<const RTT::TaskContext*> &components) {
+    static const RTT::Attribute< bool >* pred = getBoolAttribute("ext_commands", "recvIdleCmd", components);
     return pred->get();
 }
 
-bool recvIdleCmd( const InputDataConstPtr& in_data, const std::vector<const RTT::TaskContext*> &components) {
-    static const RTT::Attribute< bool >* pred = getBoolAttribute("ext_commands", "recvIdleCmd", components);
+bool recvVisualServoManipStCmd( const InputDataConstPtr& in_data, const std::vector<const RTT::TaskContext*> &components) {
+    static const RTT::Attribute< bool >* pred = getBoolAttribute("ext_commands", "recvVisualServoManipStCmd", components);
     return pred->get();
 }
 
 };  // namespace visual_servo_end_effector_types
 
 REGISTER_PREDICATE( visual_servo_end_effector_types::recvVisualServoCmd );
-REGISTER_PREDICATE( visual_servo_end_effector_types::recvCartImpObstCmd );
 REGISTER_PREDICATE( visual_servo_end_effector_types::recvIdleCmd );
+REGISTER_PREDICATE( visual_servo_end_effector_types::recvVisualServoManipStCmd );
