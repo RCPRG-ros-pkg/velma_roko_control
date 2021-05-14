@@ -54,6 +54,8 @@
     <connection from="visual_servo_fake.xce_end_OUTPORT"    to="manipulation_strategy.xce_end_INPORT" />
 
 
+    <connection from="manipulation_strategy.cmd_cart_r_imp_OUTPORT"       to="cmdConcate.cart_r_imp_INPORT" />
+
 
     <ros_stream port="ext_commands.cmd_INPORT"    topic="/visual_servo_end_effector/cmd_in" />
 
