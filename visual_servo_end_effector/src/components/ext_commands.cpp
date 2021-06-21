@@ -1,5 +1,5 @@
 /*
- Copyright (c) 2017, Robot Control and Pattern Recognition Group, Warsaw University of Technology
+ Copyright (c) 2021, Robot Control and Pattern Recognition Group, Warsaw University of Technology
  All rights reserved.
  
  Redistribution and use in source and binary forms, with or without
@@ -41,11 +41,13 @@ public:
         , recvVisualServoCmd_(false)
         , recvIdleCmd_(false)
         , recvVisualServoManipStCmd_(false)
+        , recvDelayTestCmd_(false)
     {
         this->ports()->addPort(port_cmd_in_);
         this->addAttribute("recvVisualServoCmd", recvVisualServoCmd_);
         this->addAttribute("recvIdleCmd", recvIdleCmd_);
         this->addAttribute("recvVisualServoManipStCmd", recvVisualServoManipStCmd_);
+        this->addAttribute("recvDelayTestCmd", recvDelayTestCmd_);
     }
 
     void updateHook() {
@@ -53,21 +55,31 @@ public:
         if (port_cmd_in_.read(cmd) == RTT::NewData) {
             if (cmd.data == 0) {
                 std::cout << "ExtCommandsComponent: Received command: idle" << std::endl;
-                recvVisualServoCmd_ = false;
                 recvIdleCmd_ = true;
+                recvVisualServoCmd_ = false;
                 recvVisualServoManipStCmd_ = false;
+                recvDelayTestCmd_ = false;
             }
             else if (cmd.data == 1) {
                 std::cout << "ExtCommandsComponent: Received command: visual_servo" << std::endl;
-                recvVisualServoCmd_ = true;
                 recvIdleCmd_ = false;
+                recvVisualServoCmd_ = true;
                 recvVisualServoManipStCmd_ = false;
+                recvDelayTestCmd_ = false;
             }
             else if (cmd.data == 2) {
                 std::cout << "ExtCommandsComponent: Received command: visual_servo_manip_st" << std::endl;
                 recvVisualServoCmd_ = false;
                 recvIdleCmd_ = false;
                 recvVisualServoManipStCmd_ = true;
+                recvDelayTestCmd_ = false;
+            }
+            else if (cmd.data == 3) {
+                std::cout << "ExtCommandsComponent: Received command: delay_test" << std::endl;
+                recvVisualServoCmd_ = false;
+                recvIdleCmd_ = false;
+                recvVisualServoManipStCmd_ = false;
+                recvDelayTestCmd_ = true;
             }
             else {
                 std::cout << "ExtCommandsComponent: Received unknown command" << std::endl;
@@ -81,6 +93,7 @@ private:
     bool recvVisualServoCmd_;
     bool recvIdleCmd_;
     bool recvVisualServoManipStCmd_;
+    bool recvDelayTestCmd_;
 };
 
 }   // namespace velma_core_cs_types

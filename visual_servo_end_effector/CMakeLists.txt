@@ -45,6 +45,7 @@ orocos_component(visual_servo_end_effector
     src/components/ext_commands.cpp
     src/components/manipulation_strategy.cpp
     src/components/visual_servo_fake_end_effector.cpp
+    src/components/delay_test.cpp
 )
 target_link_libraries(visual_servo_end_effector ${catkin_LIBRARIES} ${USE_OROCOS_LIBRARIES} rtt-${PROJECT_NAME}-master)
 

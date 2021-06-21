@@ -24,6 +24,7 @@
   <build_depend>rcprg_planner</build_depend>
   <build_depend>behavior_switch_action_msgs</build_depend>
   <build_depend>rtt_behavior_switch_action_msgs</build_depend>
+  <build_depend>simulation_control_msgs</build_depend>
 
   <run_depend>rtt</run_depend>
   <run_depend>ocl</run_depend>
@@ -31,6 +32,7 @@
   <run_depend>velma_core_cs_task_cs_msgs</run_depend>
   <run_depend>rtt_actionlib</run_depend>
   <run_depend>rcprg_planner</run_depend>
+  <run_depend>simulation_control_msgs</run_depend>
 
   <!-- ROS Msg Typekits and Srv Proxies -->
   <build_depend>rtt_std_msgs</build_depend>

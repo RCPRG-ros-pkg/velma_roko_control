@@ -34,6 +34,17 @@
 #include "velma_core_cs_task_cs_msgs/StatusHead.h"
 #include "velma_core_cs_task_cs_msgs/VelmaHeadTrajectoryPoint.h"
 
+
+
+#include <rtt/deployment/ComponentLoader.hpp>
+
+#include <rtt_roscomm/rostopic.h>
+#include <rtt_roscomm/rosservice.h>
+#include <std_msgs/typekit/String.h>
+#include <std_srvs/Empty.h>
+
+#include <simulation_control_msgs/EnableSim.h>
+
 namespace visual_servo_head_types {
 
 class VisualServoComponent: public RTT::TaskContext {
@@ -43,12 +54,48 @@ public:
         , port_status_head_in_("st_head_INPORT")
         , port_cmd_head_out_("cmd_head_OUTPORT")
         , goal_pos_(1.0)    // For simple motion generation
+        , service_caller_("enable_sim")
     {
         this->ports()->addPort(port_status_head_in_);
         this->ports()->addPort(port_cmd_head_out_);
+
+        prev_time_ = rtt_rosclock::host_now();
+    }
+
+    bool configureHook() {
+        //TODO: use simulation_control_msgs::EnableSim ROS service to pause simulation for each cycle
+        // based on: ws_orocos/src/orocos/rtt_ros_integration/tests/rtt_roscomm_tests/test/transport_tests.cpp
+        //service_name_ = ros::names::resolve("/gazebo/enable_sim");
+        service_name_ = "/gazebo/enable_sim";
+
+        // Import plugins
+        RTT::ComponentLoader::Instance()->import("rtt_rosnode", "" );
+        RTT::ComponentLoader::Instance()->import("rtt_roscomm", "" );
+        RTT::ComponentLoader::Instance()->import("rtt_std_srvs", "" );
+
+        // Load the rosservice service
+        boost::weak_ptr<rtt_rosservice::ROSService> rosservice;
+        rosservice = getProvider<rtt_rosservice::ROSService>("rosservice");
+
+        // Create a service client
+        requires()->addOperationCaller(service_caller_);
+        rosservice.lock()->connect("enable_sim", service_name_, "simulation_control_msgs/EnableSim");
+        //service_caller.ready();
+
+        // Disconnect the service
+        //rosservice.lock()->disconnect(service_name_);
+
     }
 
     void updateHook() {
+
+        //std::cout <<  rtt_rosclock::host_now() << std::endl;
+        ros::Time current_time = rtt_rosclock::host_now();
+        if ((current_time - prev_time_).toSec() < 0.001) {
+            std::cout <<  prev_time_ << ", " << current_time << std::endl;
+        }
+        prev_time_ = current_time;
+
         velma_core_cs_task_cs_msgs::StatusHead st_head;
         if (port_status_head_in_.read(st_head) == RTT::NewData) {
 
@@ -145,6 +192,12 @@ public:
 
             port_cmd_head_out_.write(cmd);
         }
+
+        // Call the service
+        simulation_control_msgs::EnableSim enable_sim;
+        enable_sim.request.run_steps = 1;
+        enable_sim.request.block = true;
+        service_caller_(enable_sim.request, enable_sim.response);
     }
 
 private:
@@ -153,6 +206,11 @@ private:
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandHead > port_cmd_head_out_;
 
     double goal_pos_;   // For simple motion generation
+    ros::Time prev_time_;
+
+    std::string service_name_;
+    RTT::OperationCaller<bool(simulation_control_msgs::EnableSim::Request&, simulation_control_msgs::EnableSim::Response&)> service_caller_;
+
 };
 
 }   // namespace velma_core_cs_types

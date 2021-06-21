@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   common_interfaces
   subsystem_common
   controller_common
+  simulation_control_msgs
   )
 
 find_package(Eigen3 REQUIRED)

@@ -61,8 +61,14 @@ bool recvVisualServoManipStCmd( const InputDataConstPtr& in_data, const std::vec
     return pred->get();
 }
 
+bool recvDelayTestCmd( const InputDataConstPtr& in_data, const std::vector<const RTT::TaskContext*> &components) {
+    static const RTT::Attribute< bool >* pred = getBoolAttribute("ext_commands", "recvDelayTestCmd", components);
+    return pred->get();
+}
+
 };  // namespace visual_servo_end_effector_types
 
 REGISTER_PREDICATE( visual_servo_end_effector_types::recvVisualServoCmd );
 REGISTER_PREDICATE( visual_servo_end_effector_types::recvIdleCmd );
 REGISTER_PREDICATE( visual_servo_end_effector_types::recvVisualServoManipStCmd );
+REGISTER_PREDICATE( visual_servo_end_effector_types::recvDelayTestCmd );
