@@ -34,7 +34,7 @@
 #include "velma_core_cs_task_cs_msgs/StatusHead.h"
 #include "velma_core_cs_task_cs_msgs/VelmaHeadTrajectoryPoint.h"
 
-
+#include <Eigen/Dense>
 
 #include <rtt/deployment/ComponentLoader.hpp>
 
@@ -50,113 +50,113 @@ namespace visual_servo_head_types {
 class VisualServoComponent: public RTT::TaskContext {
 public:
     explicit VisualServoComponent(const std::string &name)
-        : RTT::TaskContext(name)
+        : RTT::TaskContext(name, PreOperational)
         , port_status_head_in_("st_head_INPORT")
+        , port_q_in_("q_INPORT")
         , port_cmd_head_out_("cmd_head_OUTPORT")
-        , goal_pos_(1.0)    // For simple motion generation
-        , service_caller_("enable_sim")
     {
         this->ports()->addPort(port_status_head_in_);
+        this->ports()->addPort(port_q_in_);
         this->ports()->addPort(port_cmd_head_out_);
-
-        prev_time_ = rtt_rosclock::host_now();
     }
 
-    bool configureHook() {
-        //TODO: use simulation_control_msgs::EnableSim ROS service to pause simulation for each cycle
-        // based on: ws_orocos/src/orocos/rtt_ros_integration/tests/rtt_roscomm_tests/test/transport_tests.cpp
-        //service_name_ = ros::names::resolve("/gazebo/enable_sim");
-        service_name_ = "/gazebo/enable_sim";
+    virtual bool configureHook() {
+        buf_size_ = 10000;
+        buf_idx_ = 0;
+        buf_a_.resize(buf_size_);
+        buf_b_.resize(buf_size_);
+        buf_c_.resize(buf_size_);
 
-        // Import plugins
-        RTT::ComponentLoader::Instance()->import("rtt_rosnode", "" );
-        RTT::ComponentLoader::Instance()->import("rtt_roscomm", "" );
-        RTT::ComponentLoader::Instance()->import("rtt_std_srvs", "" );
-
-        // Load the rosservice service
-        boost::weak_ptr<rtt_rosservice::ROSService> rosservice;
-        rosservice = getProvider<rtt_rosservice::ROSService>("rosservice");
-
-        // Create a service client
-        requires()->addOperationCaller(service_caller_);
-        rosservice.lock()->connect("enable_sim", service_name_, "simulation_control_msgs/EnableSim");
-        //service_caller.ready();
-
-        // Disconnect the service
-        //rosservice.lock()->disconnect(service_name_);
-
+        return true;
     }
 
-    void updateHook() {
+    virtual bool startHook() {
+        is_first_step_ = true;
+        return true;
+    }
 
-        //std::cout <<  rtt_rosclock::host_now() << std::endl;
-        ros::Time current_time = rtt_rosclock::host_now();
-        if ((current_time - prev_time_).toSec() < 0.001) {
-            std::cout <<  prev_time_ << ", " << current_time << std::endl;
+    virtual void stopHook() {
+        std::cout << buf_size_ << " " << buf_idx_ << std::endl;
+        for (int i = 0; i < buf_idx_; ++i) {
+            std::cout << buf_a_[i] << " " << buf_b_[i] << " " << buf_c_[i] << std::endl;
         }
-        prev_time_ = current_time;
+    }
+
+    virtual void updateHook() {
+
+        port_q_in_.read(q_in_);
 
         velma_core_cs_task_cs_msgs::StatusHead st_head;
         if (port_status_head_in_.read(st_head) == RTT::NewData) {
 
             // Simple motion generation
-            double abs_error = fabs(st_head.q_desired[0] - goal_pos_);
-            if (abs_error < 0.01) {
-                goal_pos_ = -goal_pos_;
-                abs_error = fabs(st_head.q_desired[0] - goal_pos_);
-                std::cout << "Set goal point to " << goal_pos_ << std::endl;
+            if (is_first_step_) {
+                is_first_step_ = false;
+                goal_pos_ = st_head.q_desired[0];
+                if (goal_pos_ < 0) {
+                    // Go up
+                    phase_ = 0;
+                }
+                else {
+                    // Go down
+                    phase_ = 1;
+                }
             }
 
-            double vel = 0.5;   // rad/s
-            double time_left = abs_error / vel;
+            // Save values for printing
+            //std::cout << st_head.q_desired[0] << ", " << goal_pos_ << ", " << q_in_(15) << std::endl;
+            if (buf_idx_ < buf_size_) {
+                buf_a_[buf_idx_] = st_head.q_desired[0];
+                buf_b_[buf_idx_] = goal_pos_;
+                buf_c_[buf_idx_] = q_in_(15);
+                ++buf_idx_;
+            }
 
-            //st_head.status
+            double goal_vel;
+            double vel = 0.5;   // rad/s
+            double frequency = 500.0;
+
+            double goal_pos2, goal_pos3;
+            if (phase_ == 0) {
+                goal_pos_ += vel / frequency;
+                goal_pos2 = goal_pos_ + vel / frequency;
+                goal_pos3 = goal_pos2 + vel / frequency;
+                goal_vel = vel;
+            }
+            else {
+                goal_pos_ -= vel / frequency;
+                goal_pos2 = goal_pos_ - vel / frequency;
+                goal_pos3 = goal_pos2 - vel / frequency;
+                goal_vel = -vel;
+            }
+
+            if (goal_pos_ > 1.0) {
+                // Go down
+                phase_ = 1;
+                std::cout << "Set goal point to -1" << std::endl;
+            }
+            else if (goal_pos_ < -1.0) {
+                // Go up
+                phase_ = 0;
+                std::cout << "Set goal point to 1" << std::endl;
+            }
 
             velma_core_cs_task_cs_msgs::CommandHead cmd;
 
-            // time
-            cmd.start = rtt_rosclock::host_now();
-
-            // VelmaHeadTrajectoryPoint[50]
-            // cmd.trj
-
-            //std::cout << cmd.start.toSec() << ": current q_des: " << st_head.q_desired[0] << ", goal: " << goal_pos_
-            //            << ", current dq_des: " << st_head.dq_desired[0] << ", time_left: "
-            //            << time_left << std::endl;
-
-            // Set the curernt point
-            velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_current = cmd.trj[0];
-
-            // float64[2]
-            pt_current.positions[0] = st_head.q_desired[0];
-            pt_current.positions[1] = st_head.q_desired[1];
-
-            //float64[2]
-            pt_current.velocities[0] = st_head.dq_desired[0];
-            pt_current.velocities[1] = st_head.dq_desired[1];
-
-            //float64[2]
-            pt_current.accelerations[0] = 0;   // not used
-            pt_current.accelerations[1] = 0;   // not used
-
-            //duration
-            pt_current.time_from_start = ros::Duration( 0 );
-
-            //bool
-            pt_current.use_velocities = true;
-
-            //bool
-            pt_current.use_accelerations = false;
+            // Use iteration index
+            cmd.start = ros::Time(0);
 
             // Set the next point
-            velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_next = cmd.trj[1];
+            velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_next = cmd.trj[0];
+            velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_next2 = cmd.trj[1];
+            velma_core_cs_task_cs_msgs::VelmaHeadTrajectoryPoint& pt_next3 = cmd.trj[2];
 
             // float64[2]
             pt_next.positions[0] = goal_pos_;
             pt_next.positions[1] = st_head.q_desired[1];
 
             //float64[2]
-            pt_next.velocities[0] = 0.0;    // stop at goal point
+            pt_next.velocities[0] = goal_vel;    // stop at goal point
             pt_next.velocities[1] = 0.0;    // stop at goal point
 
             //float64[2]
@@ -164,7 +164,10 @@ public:
             pt_next.accelerations[1] = 0;   // not used in this case
 
             //duration
-            pt_next.time_from_start = ros::Duration( time_left );
+            //pt_next.time_from_start = ros::Duration( time_left );
+
+            // Use iteration index: this cycle
+            pt_next.time_from_start = ros::Duration( 0, 0 );
 
             //bool
             pt_next.use_velocities = true;
@@ -172,8 +175,32 @@ public:
             //bool
             pt_next.use_accelerations = false;
 
+            // Two points for the next two iterations - they are never executed, bacause
+            // we send a new command in every step
+            pt_next2.positions[0] = goal_pos2;
+            pt_next2.positions[1] = st_head.q_desired[1];
+            pt_next2.velocities[0] = goal_vel;    // stop at goal point
+            pt_next2.velocities[1] = 0.0;    // stop at goal point
+            pt_next2.accelerations[0] = 0;   // not used in this case
+            pt_next2.accelerations[1] = 0;   // not used in this case
+            pt_next2.time_from_start = ros::Duration( 1, 0 );
+            pt_next2.use_velocities = true;
+            pt_next2.use_accelerations = false;
+
+
+            pt_next3.positions[0] = goal_pos3;
+            pt_next3.positions[1] = st_head.q_desired[1];
+            pt_next3.velocities[0] = goal_vel;    // stop at goal point
+            pt_next3.velocities[1] = 0.0;    // stop at goal point
+            pt_next3.accelerations[0] = 0;   // not used in this case
+            pt_next3.accelerations[1] = 0;   // not used in this case
+            pt_next3.time_from_start = ros::Duration( 2, 0 );
+            pt_next3.use_velocities = true;
+            pt_next3.use_accelerations = false;
+
+
             // uint32 
-            cmd.count_trj = 2;  // there are two points in the trajectory: the current and the next
+            cmd.count_trj = 3;  // there are two points in the trajectory: the current and the next
 
             // float64[2]
             cmd.path_tolerance[0] = 0;  // not used in this case
@@ -192,28 +219,33 @@ public:
 
             port_cmd_head_out_.write(cmd);
         }
-
-        // Call the service
-        simulation_control_msgs::EnableSim enable_sim;
-        enable_sim.request.run_steps = 1;
-        enable_sim.request.block = true;
-        service_caller_(enable_sim.request, enable_sim.response);
+        else {
+            std::cout << "no new data" << std::endl;
+        }
     }
 
 private:
     // OROCOS ports
     RTT::InputPort<velma_core_cs_task_cs_msgs::StatusHead > port_status_head_in_;
+
+    typedef Eigen::Matrix<double, 33, 1>  VectorQ;
+    VectorQ q_in_;
+    RTT::InputPort<VectorQ > port_q_in_;
+
     RTT::OutputPort<velma_core_cs_task_cs_msgs::CommandHead > port_cmd_head_out_;
 
     double goal_pos_;   // For simple motion generation
-    ros::Time prev_time_;
+    int phase_;
+    bool is_first_step_;
 
-    std::string service_name_;
-    RTT::OperationCaller<bool(simulation_control_msgs::EnableSim::Request&, simulation_control_msgs::EnableSim::Response&)> service_caller_;
-
+    // Used for printing only
+    int buf_size_;
+    int buf_idx_;
+    std::vector<double> buf_a_;
+    std::vector<double> buf_b_;
+    std::vector<double> buf_c_;
 };
 
 }   // namespace velma_core_cs_types
 
 ORO_LIST_COMPONENT_TYPE(visual_servo_head_types::VisualServoComponent)
-

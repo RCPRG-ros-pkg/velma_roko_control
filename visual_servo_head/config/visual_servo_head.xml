@@ -27,6 +27,7 @@
     <component type="visual_servo_head_types::ExtCommandsComponent" name="ext_commands" running="true" />
 
     <connection from="stSplit.head_OUTPORT"             to="visual_servo.st_head_INPORT" />
+    <connection from="stSplit.q_OUTPORT"                to="visual_servo.q_INPORT" />
     <connection from="visual_servo.cmd_head_OUTPORT"    to="cmdConcate.head_INPORT" />
 
     <ros_stream port="ext_commands.cmd_INPORT"    topic="/visual_servo_head/cmd_in" />
